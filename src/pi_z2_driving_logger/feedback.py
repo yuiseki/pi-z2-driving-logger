@@ -61,13 +61,17 @@ class BuzzerController:
         self.short_beep()
 
     def beep_self_start(self) -> None:
-        """long×1 — switched to self (I am driving)"""
+        """short, short, long (ピピピー) — switched to self (I am driving)"""
+        self.short_beep()
+        time.sleep(0.08)
+        self.short_beep()
+        time.sleep(0.08)
         self.long_beep()
 
     def beep_other_start(self) -> None:
-        """short×2 — switched to other"""
+        """short, short snappy (ピピッ) — switched to other"""
         self.short_beep()
-        time.sleep(0.1)
+        time.sleep(0.05)
         self.short_beep()
 
     def beep_no_fix_warning(self) -> None:
