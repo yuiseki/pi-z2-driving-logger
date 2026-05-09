@@ -24,8 +24,11 @@ GPX_FOOTER = "</gpx>\n"
 
 
 def _format_gpx_time(ts: str) -> str:
-    """Return ISO8601 UTC time string (best effort from NMEA hhmmss.ss)."""
-    # Use current UTC time as a fallback
+    """Return ISO8601 UTC time string (best effort from NMEA hhmmss.ss).
+
+    TODO: NMEA provides only hhmmss without date; use system time for now.
+    Proper fix: combine GPRMC date+time fields to construct correct UTC timestamp.
+    """
     return datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
