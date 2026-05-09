@@ -30,7 +30,7 @@ DOUBLE_CLICK_MAX_S = 0.600    # maximum interval between two clicks
 GPX_FLUSH_INTERVAL_S = 60
 
 # Buzzer durations (seconds)
-BUZZER_LONG_MS = 500
+BUZZER_LONG_MS = 800
 BUZZER_SHORT_MS = 100
 
 # LED blink intervals (seconds)

@@ -301,12 +301,11 @@ class DrivingLogger:
         gps = self._gps.get_state() if self._gps else GPSState()
         if not gps.fix_valid:
             logger.warning("No GPS fix when switching to self")
-            self._feedback.on_no_fix_warning()
         event = self._state_machine.transition("self", gps, source="maker_phat")
         self._storage.write_event(event)
         self._flush_state()
         if event["type"] == "driver_state_changed_to_self":
-            self._feedback.on_switch_to_self()
+            self._feedback.on_switch_to_self(fix_valid=gps.fix_valid)
             if gps.lat is not None and gps.lon is not None:
                 self._storage.add_waypoint(gps.lat, gps.lon, "driver:self", gps.timestamp)
         elif "ignored_duplicate" in event["type"]:
@@ -316,12 +315,11 @@ class DrivingLogger:
         gps = self._gps.get_state() if self._gps else GPSState()
         if not gps.fix_valid:
             logger.warning("No GPS fix when switching to other")
-            self._feedback.on_no_fix_warning()
         event = self._state_machine.transition("other", gps, source="maker_phat")
         self._storage.write_event(event)
         self._flush_state()
         if event["type"] == "driver_state_changed_to_other":
-            self._feedback.on_switch_to_other()
+            self._feedback.on_switch_to_other(fix_valid=gps.fix_valid)
             if gps.lat is not None and gps.lon is not None:
                 self._storage.add_waypoint(gps.lat, gps.lon, "driver:other", gps.timestamp)
         elif "ignored_duplicate" in event["type"]:

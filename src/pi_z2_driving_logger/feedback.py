@@ -60,19 +60,33 @@ class BuzzerController:
         time.sleep(0.1)
         self.short_beep()
 
-    def beep_self_start(self) -> None:
-        """short, short, long (ピピピー) — switched to self (I am driving)"""
+    def beep_self_start(self, fix_valid: bool = True) -> None:
+        """short, short, long (ピピピー) — switched to self.
+        If no fix: append short×2 warning after the long beep.
+        """
         self.short_beep()
         time.sleep(0.08)
         self.short_beep()
         time.sleep(0.08)
         self.long_beep()
+        if not fix_valid:
+            time.sleep(0.12)
+            self.short_beep()
+            time.sleep(0.08)
+            self.short_beep()
 
-    def beep_other_start(self) -> None:
-        """short, short snappy (ピピッ) — switched to other"""
+    def beep_other_start(self, fix_valid: bool = True) -> None:
+        """short, short snappy (ピピッ) — switched to other.
+        If no fix: append short×2 warning after.
+        """
         self.short_beep()
         time.sleep(0.05)
         self.short_beep()
+        if not fix_valid:
+            time.sleep(0.12)
+            self.short_beep()
+            time.sleep(0.08)
+            self.short_beep()
 
     def beep_no_fix_warning(self) -> None:
         """short×3 — no GPS fix"""
@@ -286,15 +300,15 @@ class FeedbackController:
         self.leds.stop_indicator()
         self.buzzer.beep_shutdown()
 
-    def on_switch_to_self(self) -> None:
+    def on_switch_to_self(self, fix_valid: bool = True) -> None:
         self.leds.state_indicator_self()
         self.leds.animate_switch_to_self()
-        threading.Thread(target=self.buzzer.beep_self_start, daemon=True).start()
+        threading.Thread(target=self.buzzer.beep_self_start, kwargs={"fix_valid": fix_valid}, daemon=True).start()
 
-    def on_switch_to_other(self) -> None:
+    def on_switch_to_other(self, fix_valid: bool = True) -> None:
         self.leds.state_indicator_other()
         self.leds.animate_switch_to_other()
-        threading.Thread(target=self.buzzer.beep_other_start, daemon=True).start()
+        threading.Thread(target=self.buzzer.beep_other_start, kwargs={"fix_valid": fix_valid}, daemon=True).start()
 
     def on_no_fix_warning(self) -> None:
         self.leds.animate_error()
