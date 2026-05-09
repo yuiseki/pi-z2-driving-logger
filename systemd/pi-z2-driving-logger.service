@@ -6,6 +6,7 @@ After=network.target
 Type=simple
 User=yuiseki
 WorkingDirectory=/home/yuiseki/Workspaces/repos/_yuiseki/pi-z2-driving-logger
+Environment=PYTHONPATH=/home/yuiseki/Workspaces/repos/_yuiseki/pi-z2-driving-logger/src
 ExecStart=/usr/bin/python3 -m pi_z2_driving_logger
 Restart=always
 RestartSec=5
