@@ -139,9 +139,9 @@ class LEDController:
                 continue
 
             if self._driver_state == "self":
-                self._blink_led(self._n - 1, self._state_blink_s)
-            else:
                 self._blink_led(0, self._state_blink_s)
+            else:
+                self._blink_led(self._n - 1, self._state_blink_s)
 
     def _blink_led(self, idx: int, interval_s: float) -> None:
         """Blink a single LED once (on for interval_s/2, off for interval_s/2),
