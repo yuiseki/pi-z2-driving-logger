@@ -136,16 +136,23 @@ class LEDController:
         self._driver_state = state
 
     def _indicator_loop(self) -> None:
+        shown_state = None
         while not self._stop_event.is_set():
             # Paused: wait until animation is done
             if self._pause_event.is_set():
+                self.all_off()
+                shown_state = None
                 self._stop_event.wait(0.05)
                 continue
 
-            if self._driver_state == "self":
-                self._blink_led(0, self._state_blink_s)
-            else:
-                self._blink_led(self._n - 1, self._state_blink_s)
+            state = self._driver_state
+            if state != shown_state:
+                self.all_off()
+                idx = 0 if state == "self" else self._n - 1
+                self._leds[idx].on()
+                shown_state = state
+
+            self._stop_event.wait(0.05)
 
     def _blink_led(self, idx: int, interval_s: float) -> None:
         """Blink a single LED once (on for interval_s/2, off for interval_s/2),
