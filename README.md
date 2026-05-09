@@ -57,8 +57,8 @@ Reserved for future POI (point of interest) logging.
 
 ## LED Feedback
 
-- **Self state**: rightmost LED slow blink
-- **Other state**: leftmost LED slow blink
+- **Self state**: leftmost LED slow blink
+- **Other state**: rightmost LED slow blink
 - **State change animation**: flow pattern pauses indicator, runs animation, resumes
 
 ## Installation
