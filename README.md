@@ -50,15 +50,15 @@ Reserved for future POI (point of interest) logging.
 |---|---|
 | Startup | short×2 |
 | Shutdown | long + short |
-| Switch to self | long×1 |
-| Switch to other | short×2 |
+| Switch to self | short, short, long（ピピピー） |
+| Switch to other | short, short（ピピッ） |
 | No GPS fix warning | short×3 |
 | Duplicate state warning | short×3 |
 
 ## LED Feedback
 
-- **Self state**: leftmost LED slow blink
-- **Other state**: rightmost LED slow blink
+- **Self state**: leftmost LED steady on
+- **Other state**: rightmost LED steady on
 - **State change animation**: flow pattern pauses indicator, runs animation, resumes
 
 ## Installation
