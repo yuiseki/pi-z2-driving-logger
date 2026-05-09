@@ -137,3 +137,45 @@ class TestOtherPatterns:
         with patch("time.sleep"):
             ctrl.beep_duplicate_warning()
         assert b.beep_count == 3
+
+
+# ---------------------------------------------------------------------------
+# Walk POI beep patterns
+# ---------------------------------------------------------------------------
+
+def _make_controller_with_medium(buzzer) -> BuzzerController:
+    return BuzzerController(buzzer, long_ms=1, short_ms=1, medium_ms=1)
+
+
+class TestWalkPoiBuzzerPatterns:
+    def test_beep_walk_poi_is_1_beep(self):
+        """walk_poi: single short beep (ピッ)."""
+        b = _CountingBuzzer()
+        ctrl = _make_controller_with_medium(b)
+        with patch("time.sleep"):
+            ctrl.beep_walk_poi()
+        assert b.beep_count == 1, f"expected 1 beep, got {b.beep_count}"
+
+    def test_beep_walk_poi_important_is_1_beep(self):
+        """walk_poi_important: single medium beep (ピー)."""
+        b = _CountingBuzzer()
+        ctrl = _make_controller_with_medium(b)
+        with patch("time.sleep"):
+            ctrl.beep_walk_poi_important()
+        assert b.beep_count == 1, f"expected 1 beep, got {b.beep_count}"
+
+    def test_beep_walk_poi_double_is_2_beeps(self):
+        """walk_poi_double: two short beeps (ピピッ)."""
+        b = _CountingBuzzer()
+        ctrl = _make_controller_with_medium(b)
+        with patch("time.sleep"):
+            ctrl.beep_walk_poi_double()
+        assert b.beep_count == 2, f"expected 2 beeps, got {b.beep_count}"
+
+    def test_medium_beep_is_1_beep(self):
+        """medium_beep: exactly 1 beep."""
+        b = _CountingBuzzer()
+        ctrl = _make_controller_with_medium(b)
+        with patch("time.sleep"):
+            ctrl.medium_beep()
+        assert b.beep_count == 1

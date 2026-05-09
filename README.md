@@ -40,9 +40,15 @@ GPS driving logger for Raspberry Pi Zero 2 WH with Maker pHAT.
 1. Press Right button once
 2. Press Right button again within 600ms (and at least 100ms after first)
 
-### Left button
+### Left button — walking / field survey mode
 
-Reserved for future POI (point of interest) logging.
+| Gesture | Event | Buzzer |
+|---|---|---|
+| Single click | `walk_poi` | ピッ (short×1) |
+| Long press (≥1s) | `walk_poi_important` | ピー (medium×1) |
+| Double click | `walk_poi_double` | ピピッ (short×2) |
+
+Left button events do not change `driver_state`. GPS position is recorded when fix is available.
 
 ## Buzzer Feedback
 

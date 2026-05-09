@@ -12,6 +12,7 @@ from typing import Optional
 
 from .config import Config, GPS_DEVICE_PRIMARY, GPS_DEVICE_FALLBACK, LOG_DIR_DEFAULT
 from .gps import GPSReader, GPSState
+from .left_button import LeftButtonGestureDetector, make_walk_poi_event
 from .nmea import parse_nmea_sentence
 from .phat import MakerPHAT
 from .feedback import FeedbackController
@@ -228,6 +229,7 @@ class DrivingLogger:
         self._feedback: Optional[FeedbackController] = None
         self._state_machine: Optional[DriverStateMachine] = None
         self._btn_handler: Optional[ButtonHandler] = None
+        self._left_btn_detector: Optional[LeftButtonGestureDetector] = None
 
     def run(self) -> None:
         """Initialize all components and enter the main loop."""
@@ -271,6 +273,19 @@ class DrivingLogger:
             on_left_cb=self._handle_left_button,
         )
         self._btn_handler.start()
+
+        # Left button gesture detector
+        self._left_btn_detector = LeftButtonGestureDetector(
+            on_single=self._handle_walk_poi,
+            on_long=self._handle_walk_poi_important,
+            on_double=self._handle_walk_poi_double,
+            long_press_s=self._cfg.chord_hold_s,
+            double_click_min_s=self._cfg.double_click_min_s,
+            double_click_max_s=self._cfg.double_click_max_s,
+        )
+        if self._phat.is_gpio_available():
+            self._phat.btn_left.when_pressed = self._left_btn_detector.on_press
+            self._phat.btn_left.when_released = self._left_btn_detector.on_release
 
         # Install signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
@@ -326,18 +341,39 @@ class DrivingLogger:
             self._feedback.on_duplicate_warning()
 
     def _handle_left_button(self) -> None:
-        logger.info("Left button pressed (reserved for future POI)")
+        # Legacy callback — gesture detection is now handled by LeftButtonGestureDetector.
+        # This is kept for the polling-mode ButtonHandler compatibility.
+        logger.debug("Left button press detected by ButtonHandler (gesture detector handles it)")
+
+    def _handle_walk_poi(self) -> None:
+        logger.info("Walk POI: single click")
         gps = self._gps.get_state() if self._gps else GPSState()
-        event = {
-            "type": "left_button_pressed",
-            "system_time": __import__("datetime").datetime.now().astimezone().isoformat(),
-            "lat": gps.lat,
-            "lon": gps.lon,
-            "fix_valid": gps.fix_valid,
-            "nmea_time": gps.timestamp,
-            "note": "reserved for future POI",
-        }
+        event = make_walk_poi_event("walk_poi", gps, self._state_machine.state)
         self._storage.write_event(event)
+        if gps.fix_valid and gps.lat is not None:
+            self._storage.add_waypoint(gps.lat, gps.lon, "walk_poi", gps.timestamp)
+        self._feedback.on_walk_poi()
+        self._flush_state()
+
+    def _handle_walk_poi_important(self) -> None:
+        logger.info("Walk POI: long press (important)")
+        gps = self._gps.get_state() if self._gps else GPSState()
+        event = make_walk_poi_event("walk_poi_important", gps, self._state_machine.state)
+        self._storage.write_event(event)
+        if gps.fix_valid and gps.lat is not None:
+            self._storage.add_waypoint(gps.lat, gps.lon, "walk_poi_important", gps.timestamp)
+        self._feedback.on_walk_poi_important()
+        self._flush_state()
+
+    def _handle_walk_poi_double(self) -> None:
+        logger.info("Walk POI: double click")
+        gps = self._gps.get_state() if self._gps else GPSState()
+        event = make_walk_poi_event("walk_poi_double", gps, self._state_machine.state)
+        self._storage.write_event(event)
+        if gps.fix_valid and gps.lat is not None:
+            self._storage.add_waypoint(gps.lat, gps.lon, "walk_poi_double", gps.timestamp)
+        self._feedback.on_walk_poi_double()
+        self._flush_state()
 
     def _flush_state(self) -> None:
         gps = self._gps.get_state() if self._gps else GPSState()
@@ -361,6 +397,9 @@ class DrivingLogger:
 
     def _teardown(self) -> None:
         logger.info("Shutting down...")
+
+        if self._left_btn_detector:
+            self._left_btn_detector.stop()
 
         if self._btn_handler:
             self._btn_handler.stop()

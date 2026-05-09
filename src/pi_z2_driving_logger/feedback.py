@@ -16,10 +16,11 @@ logger = logging.getLogger(__name__)
 class BuzzerController:
     """Controls the active buzzer with named patterns."""
 
-    def __init__(self, buzzer, long_ms: int = 500, short_ms: int = 100):
+    def __init__(self, buzzer, long_ms: int = 500, short_ms: int = 100, medium_ms: int = 300):
         self._buzzer = buzzer
         self._long_s = long_ms / 1000.0
         self._short_s = short_ms / 1000.0
+        self._medium_s = medium_ms / 1000.0
 
     def long_beep(self) -> None:
         self._buzzer.on()
@@ -30,6 +31,26 @@ class BuzzerController:
         self._buzzer.on()
         time.sleep(self._short_s)
         self._buzzer.off()
+
+    def medium_beep(self) -> None:
+        """300ms beep (ピー)."""
+        self._buzzer.on()
+        time.sleep(self._medium_s)
+        self._buzzer.off()
+
+    def beep_walk_poi(self) -> None:
+        """Single short beep (ピッ)."""
+        self.short_beep()
+
+    def beep_walk_poi_important(self) -> None:
+        """Single medium beep (ピー)."""
+        self.medium_beep()
+
+    def beep_walk_poi_double(self) -> None:
+        """Two short beeps (ピピッ)."""
+        self.short_beep()
+        time.sleep(0.05)
+        self.short_beep()
 
     def _beep_pattern(self, pattern: list) -> None:
         """Execute a beep pattern.
@@ -265,6 +286,14 @@ class LEDController:
         """Non-blocking error flash animation."""
         self._run_animation(self.error_flash)
 
+    def animate_blink_all(self, count: int = 1, interval: float = 0.1) -> None:
+        """Non-blocking blink-all animation."""
+        self._run_animation(self.blink_all, count=count, interval=interval)
+
+    def animate_bounce(self) -> None:
+        """Non-blocking bounce animation."""
+        self._run_animation(self.bounce)
+
 
 class FeedbackController:
     """Combines buzzer and LED feedback for high-level events."""
@@ -276,6 +305,7 @@ class FeedbackController:
             phat.buzzer,
             long_ms=cfg.buzzer_long_ms,
             short_ms=cfg.buzzer_short_ms,
+            medium_ms=cfg.buzzer_medium_ms,
         )
         self.leds = LEDController(
             phat.leds,
@@ -309,3 +339,18 @@ class FeedbackController:
 
     def on_duplicate_warning(self) -> None:
         threading.Thread(target=self.buzzer.beep_duplicate_warning, daemon=True).start()
+
+    def on_walk_poi(self) -> None:
+        """Feedback for single-click walk POI (ピッ + 1 blink)."""
+        self.leds.animate_blink_all(count=1, interval=0.1)
+        threading.Thread(target=self.buzzer.beep_walk_poi, daemon=True).start()
+
+    def on_walk_poi_important(self) -> None:
+        """Feedback for long-press walk POI important (ピー + bounce)."""
+        self.leds.animate_bounce()
+        threading.Thread(target=self.buzzer.beep_walk_poi_important, daemon=True).start()
+
+    def on_walk_poi_double(self) -> None:
+        """Feedback for double-click walk POI double (ピピッ + 2 blinks)."""
+        self.leds.animate_blink_all(count=2, interval=0.1)
+        threading.Thread(target=self.buzzer.beep_walk_poi_double, daemon=True).start()

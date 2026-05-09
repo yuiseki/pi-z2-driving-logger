@@ -32,6 +32,7 @@ GPX_FLUSH_INTERVAL_S = 60
 # Buzzer durations (seconds)
 BUZZER_LONG_MS = 400
 BUZZER_SHORT_MS = 100
+BUZZER_MEDIUM_MS = 300
 
 # LED blink intervals (seconds)
 LED_STATE_BLINK_INTERVAL_S = 1.0
@@ -68,6 +69,7 @@ class Config:
     # Buzzer
     buzzer_long_ms: int = BUZZER_LONG_MS
     buzzer_short_ms: int = BUZZER_SHORT_MS
+    buzzer_medium_ms: int = BUZZER_MEDIUM_MS
 
     # LED
     led_state_blink_interval_s: float = LED_STATE_BLINK_INTERVAL_S
