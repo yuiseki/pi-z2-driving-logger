@@ -61,32 +61,18 @@ class BuzzerController:
         self.short_beep()
 
     def beep_self_start(self, fix_valid: bool = True) -> None:
-        """short, short, long (ピピピー) — switched to self.
-        If no fix: append short×2 warning after the long beep.
-        """
+        """short, short, long (ピピピー) — switched to self."""
         self.short_beep()
         time.sleep(0.08)
         self.short_beep()
         time.sleep(0.08)
         self.long_beep()
-        if not fix_valid:
-            time.sleep(0.12)
-            self.short_beep()
-            time.sleep(0.08)
-            self.short_beep()
 
     def beep_other_start(self, fix_valid: bool = True) -> None:
-        """short, short snappy (ピピッ) — switched to other.
-        If no fix: append short×2 warning after.
-        """
+        """short, short snappy (ピピッ) — switched to other."""
         self.short_beep()
         time.sleep(0.05)
         self.short_beep()
-        if not fix_valid:
-            time.sleep(0.12)
-            self.short_beep()
-            time.sleep(0.08)
-            self.short_beep()
 
     def beep_no_fix_warning(self) -> None:
         """short×3 — no GPS fix"""
