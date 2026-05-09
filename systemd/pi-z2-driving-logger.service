@@ -1,0 +1,17 @@
+[Unit]
+Description=Pi Zero 2 WH Driving Logger (GPS + Maker pHAT)
+After=network.target
+
+[Service]
+Type=simple
+User=yuiseki
+WorkingDirectory=/home/yuiseki/Workspaces/repos/_yuiseki/pi-z2-driving-logger
+ExecStart=/usr/bin/python3 -m pi_z2_driving_logger
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pi-z2-driving-logger
+
+[Install]
+WantedBy=multi-user.target

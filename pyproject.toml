@@ -1,0 +1,18 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pi-z2-driving-logger"
+version = "0.1.0"
+description = "GPS driving logger for Raspberry Pi Zero 2 WH with Maker pHAT"
+requires-python = ">=3.11"
+dependencies = [
+    "pyserial",
+]
+
+[project.scripts]
+pi-z2-driving-logger = "pi_z2_driving_logger.main:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pi_z2_driving_logger"]
