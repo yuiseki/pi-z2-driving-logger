@@ -1,3 +1,12 @@
 *.pyc
 __pycache__/
 .pytest_cache/
+
+# local Traccar credentials / config — never commit
+.traccar.env
+traccar.env
+secrets/
+*.secret
+
+# post-processing outputs
+outputs/
