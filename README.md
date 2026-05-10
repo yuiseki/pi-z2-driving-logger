@@ -184,3 +184,79 @@ TRACCAR_ENABLED=true bash scripts/traccar_flush_once.sh
   ```
 - The `failed/` directory holds payloads that were rejected. Inspect them and delete when no longer needed.
 - If `pending/` accumulates many files (e.g., extended offline period), the next flush sends up to `TRACCAR_MAX_RETRY_PER_FLUSH` items per cycle. Increase the value or run `traccar_flush_once.sh` in a loop to drain faster.
+
+## Semantic post-processing with Traccar teacher track
+
+After a session, run the post-processor to join Pi button events (semantic ground truth) with the teacher's Traccar GPS track (spatial ground truth).
+
+### Concept
+
+| Source | Role |
+|---|---|
+| Pi `events.jsonl` | What happened (button presses, driver state changes) |
+| Traccar teacher device | Where the car was (continuous GPS track from OsmAnd) |
+
+The post-processor aligns these by timestamp and computes per-event confidence based on time delta:
+
+| Confidence | Time delta to nearest teacher position |
+|---|---|
+| `high` | ≤ 3 s |
+| `medium` | ≤ 10 s |
+| `low` | ≤ 30 s |
+| `missing_or_stale` | > 30 s |
+
+### Setup
+
+Copy and edit the credentials file (never commit the real one):
+
+```bash
+cp .traccar.env.example .traccar.env
+# edit .traccar.env with your real credentials
+```
+
+| Variable | Description |
+|---|---|
+| `TRACCAR_BASE_URL` | Traccar web UI base URL (e.g. `http://192.168.0.139:31961`) |
+| `TRACCAR_USER` | Traccar admin email |
+| `TRACCAR_PASSWORD` | Traccar admin password |
+| `TRACCAR_TEACHER_DEVICE_UNIQUE_ID` | uniqueId of teacher's device (e.g. `osmand-yui-redmi-12-5g`) |
+
+### Run
+
+```bash
+# Smoke-test: verify Traccar connectivity and list positions
+bash scripts/traccar_export_test.sh
+
+# Run full post-processing on the latest session
+bash scripts/export_semantic_trace.sh
+
+# Or specify a session directory and output dir
+bash scripts/export_semantic_trace.sh \
+  ~/pi-z2-driving-logs/sessions/20260510-102515 \
+  ~/pi-z2-driving-logs/sessions/20260510-102515/postprocess
+```
+
+### Output files
+
+| File | Description |
+|---|---|
+| `semantic_trace.jsonl` | One JSON line per Pi event with nearest teacher position, confidence, time delta, and Haversine distance |
+| `semantic_pois.geojson` | GeoJSON FeatureCollection of walk-POI events (using teacher position if confidence is high/medium, Pi GPS otherwise) |
+| `self_driving_track.geojson` | GeoJSON LineStrings of the teacher track during self-driving intervals |
+| `self_driving_track.gpx` | GPX 1.1 with one `<trkseg>` per self-driving interval |
+| `driver_intervals.json` | JSON array of self-driving intervals with start/end timestamps and point counts |
+| `pi_teacher_error.geojson` | LineString features from Pi GPS to teacher GPS at each event (spatial discrepancy) |
+| `report.json` | Session statistics: event count, POI count, self intervals, high-confidence POIs, distance errors |
+| `report.md` | Markdown summary of the session |
+
+### Direct CLI
+
+```bash
+PYTHONPATH=src python3 -m pi_z2_driving_logger.postprocess \
+  --session ~/pi-z2-driving-logs/sessions/20260510-102515 \
+  --output-dir /tmp/postprocess-output \
+  --traccar-base-url http://192.168.0.139:31961 \
+  --traccar-user admin@traccar.local \
+  --traccar-password YOUR_PASSWORD \
+  --teacher-device osmand-yui-redmi-12-5g
+```
