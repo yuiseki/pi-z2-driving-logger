@@ -76,6 +76,10 @@ class StorageManager:
         return self._session_dir
 
     @property
+    def session_id(self) -> str:
+        return os.path.basename(self._session_dir)
+
+    @property
     def raw_nmea_path(self) -> str:
         return self._raw_nmea_path
 

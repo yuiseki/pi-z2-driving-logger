@@ -18,6 +18,8 @@ from .phat import MakerPHAT
 from .feedback import FeedbackController
 from .state_machine import DriverStateMachine
 from .storage import StorageManager
+from .traccar import TraccarConfig, build_position_payload, build_event_payload
+from .traccar_queue import TraccarQueue, TraccarUploader
 
 logging.basicConfig(
     level=logging.INFO,
@@ -220,8 +222,9 @@ class ButtonHandler:
 class DrivingLogger:
     """Top-level application controller."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, traccar_cfg: Optional[TraccarConfig] = None):
         self._cfg = config
+        self._traccar_cfg = traccar_cfg or TraccarConfig.from_env()
         self._shutdown = threading.Event()
         self._storage: Optional[StorageManager] = None
         self._gps: Optional[GPSReader] = None
@@ -230,6 +233,9 @@ class DrivingLogger:
         self._state_machine: Optional[DriverStateMachine] = None
         self._btn_handler: Optional[ButtonHandler] = None
         self._left_btn_detector: Optional[LeftButtonGestureDetector] = None
+        self._traccar_queue: Optional[TraccarQueue] = None
+        self._traccar_uploader: Optional[TraccarUploader] = None
+        self._last_traccar_send_time: float = 0.0
 
     def run(self) -> None:
         """Initialize all components and enter the main loop."""
@@ -287,6 +293,27 @@ class DrivingLogger:
             self._phat.btn_left.when_pressed = self._left_btn_detector.on_press
             self._phat.btn_left.when_released = self._left_btn_detector.on_release
 
+        # Traccar uploader (optional)
+        if self._traccar_cfg.enabled:
+            self._traccar_queue = TraccarQueue(self._traccar_cfg.queue_dir)
+            self._traccar_uploader = TraccarUploader(
+                queue=self._traccar_queue,
+                endpoint=self._traccar_cfg.endpoint,
+                device_id=self._traccar_cfg.device_id,
+                flush_interval_s=self._traccar_cfg.send_interval_s,
+                timeout_s=self._traccar_cfg.timeout_s,
+                max_retry_per_flush=self._traccar_cfg.max_retry_per_flush,
+            )
+            self._traccar_uploader.start()
+            logger.info(
+                "Traccar enabled: endpoint=%s device_id=%s queue_dir=%s",
+                self._traccar_cfg.endpoint,
+                self._traccar_cfg.device_id,
+                self._traccar_cfg.queue_dir,
+            )
+        else:
+            logger.info("Traccar disabled")
+
         # Install signal handlers
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
@@ -308,6 +335,7 @@ class DrivingLogger:
                 gps = self._gps.get_state()
                 if gps.lat is not None and gps.lon is not None:
                     self._storage.add_track_point(gps.lat, gps.lon, gps.timestamp)
+                self._maybe_enqueue_position(gps)
                 self._shutdown.wait(1.0)
         finally:
             self._teardown()
@@ -323,8 +351,10 @@ class DrivingLogger:
             self._feedback.on_switch_to_self(fix_valid=gps.fix_valid)
             if gps.lat is not None and gps.lon is not None:
                 self._storage.add_waypoint(gps.lat, gps.lon, "driver:self", gps.timestamp)
+            self._enqueue_traccar_event(event["type"], gps, "maker_phat")
         elif "ignored_duplicate" in event["type"]:
             self._feedback.on_duplicate_warning()
+            self._enqueue_traccar_event(event["type"], gps, "maker_phat")
 
     def _handle_switch_to_other(self) -> None:
         gps = self._gps.get_state() if self._gps else GPSState()
@@ -337,8 +367,10 @@ class DrivingLogger:
             self._feedback.on_switch_to_other(fix_valid=gps.fix_valid)
             if gps.lat is not None and gps.lon is not None:
                 self._storage.add_waypoint(gps.lat, gps.lon, "driver:other", gps.timestamp)
+            self._enqueue_traccar_event(event["type"], gps, "maker_phat")
         elif "ignored_duplicate" in event["type"]:
             self._feedback.on_duplicate_warning()
+            self._enqueue_traccar_event(event["type"], gps, "maker_phat")
 
     def _handle_left_button(self) -> None:
         # Legacy callback — gesture detection is now handled by LeftButtonGestureDetector.
@@ -352,6 +384,7 @@ class DrivingLogger:
         self._storage.write_event(event)
         if gps.fix_valid and gps.lat is not None:
             self._storage.add_waypoint(gps.lat, gps.lon, "walk_poi", gps.timestamp)
+        self._enqueue_traccar_event("walk_poi", gps, "maker_phat_left_button")
         self._feedback.on_walk_poi()
         self._flush_state()
 
@@ -362,6 +395,7 @@ class DrivingLogger:
         self._storage.write_event(event)
         if gps.fix_valid and gps.lat is not None:
             self._storage.add_waypoint(gps.lat, gps.lon, "walk_poi_important", gps.timestamp)
+        self._enqueue_traccar_event("walk_poi_important", gps, "maker_phat_left_button")
         self._feedback.on_walk_poi_important()
         self._flush_state()
 
@@ -372,8 +406,38 @@ class DrivingLogger:
         self._storage.write_event(event)
         if gps.fix_valid and gps.lat is not None:
             self._storage.add_waypoint(gps.lat, gps.lon, "walk_poi_double", gps.timestamp)
+        self._enqueue_traccar_event("walk_poi_double", gps, "maker_phat_left_button")
         self._feedback.on_walk_poi_double()
         self._flush_state()
+
+    def _maybe_enqueue_position(self, gps: GPSState) -> None:
+        """Enqueue a position payload at the configured interval when fix is valid."""
+        if not self._traccar_queue:
+            return
+        if not gps.fix_valid:
+            return
+        now = time.monotonic()
+        if now - self._last_traccar_send_time < self._traccar_cfg.send_interval_s:
+            return
+        self._last_traccar_send_time = now
+        session_id = self._storage.session_id if self._storage else ""
+        driver_state = self._state_machine.state if self._state_machine else "other"
+        payload = build_position_payload(gps, driver_state, session_id)
+        if payload:
+            self._traccar_queue.enqueue(payload)
+
+    def _enqueue_traccar_event(self, event_type: str, gps: GPSState, source: str) -> None:
+        """Enqueue an event payload when fix is valid."""
+        if not self._traccar_queue:
+            return
+        if not gps.fix_valid:
+            return
+        session_id = self._storage.session_id if self._storage else ""
+        driver_state = self._state_machine.state if self._state_machine else "other"
+        payload = build_event_payload(event_type, gps, driver_state, session_id, source)
+        if payload:
+            self._traccar_queue.enqueue(payload)
+            logger.debug("Traccar event queued: %s", event_type)
 
     def _flush_state(self) -> None:
         gps = self._gps.get_state() if self._gps else GPSState()
@@ -397,6 +461,9 @@ class DrivingLogger:
 
     def _teardown(self) -> None:
         logger.info("Shutting down...")
+
+        if self._traccar_uploader:
+            self._traccar_uploader.stop()
 
         if self._left_btn_detector:
             self._left_btn_detector.stop()
@@ -456,6 +523,23 @@ def parse_args(argv=None) -> argparse.Namespace:
         action="store_true",
         help="Enable debug logging",
     )
+    # Traccar options (override environment variables)
+    parser.add_argument(
+        "--traccar-enabled",
+        action="store_true",
+        default=None,
+        help="Enable Traccar upload (overrides TRACCAR_ENABLED)",
+    )
+    parser.add_argument(
+        "--traccar-endpoint",
+        default=None,
+        help="Traccar OsmAnd endpoint URL (overrides TRACCAR_ENDPOINT)",
+    )
+    parser.add_argument(
+        "--traccar-device-id",
+        default=None,
+        help="Traccar device ID (overrides TRACCAR_DEVICE_ID)",
+    )
     return parser.parse_args(argv)
 
 
@@ -470,7 +554,15 @@ def main(argv=None) -> None:
         initial_driver_state=args.initial_driver_state,
     )
 
-    app = DrivingLogger(config)
+    traccar_cfg = TraccarConfig.from_env()
+    if args.traccar_enabled:
+        traccar_cfg.enabled = True
+    if args.traccar_endpoint:
+        traccar_cfg.endpoint = args.traccar_endpoint
+    if args.traccar_device_id:
+        traccar_cfg.device_id = args.traccar_device_id
+
+    app = DrivingLogger(config, traccar_cfg)
     app.run()
 
 
