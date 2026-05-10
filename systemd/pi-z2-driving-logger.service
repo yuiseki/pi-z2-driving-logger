@@ -7,6 +7,13 @@ Type=simple
 User=yuiseki
 WorkingDirectory=/home/yuiseki/Workspaces/repos/_yuiseki/pi-z2-driving-logger
 Environment=PYTHONPATH=/home/yuiseki/Workspaces/repos/_yuiseki/pi-z2-driving-logger/src
+Environment=TRACCAR_ENABLED=true
+Environment=TRACCAR_ENDPOINT=http://100.107.123.105:30055/
+Environment=TRACCAR_DEVICE_ID=pi-z2-wh
+Environment=TRACCAR_SEND_INTERVAL_SECONDS=10
+Environment=TRACCAR_QUEUE_DIR=/home/yuiseki/pi-z2-driving-logs/traccar-queue
+Environment=TRACCAR_TIMEOUT_SECONDS=5
+Environment=TRACCAR_MAX_RETRY_PER_FLUSH=50
 ExecStart=/usr/bin/python3 -m pi_z2_driving_logger
 Restart=always
 RestartSec=5
